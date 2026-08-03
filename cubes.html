@@ -1,0 +1,1403 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Cubes</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      background: #000;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      overscroll-behavior: none;
+    }
+
+    body {
+      position: relative;
+      min-width: 280px;
+      min-height: 240px;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      cursor: crosshair;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .info-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 4;
+      background: rgba(0, 0, 0, 0.22);
+      opacity: 0;
+      backdrop-filter: blur(0);
+      -webkit-backdrop-filter: blur(0);
+      transition: opacity 220ms ease, backdrop-filter 220ms ease;
+    }
+
+    .info-backdrop.is-open {
+      opacity: 1;
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+    }
+
+    .info-shell {
+      position: fixed;
+      right: max(14px, env(safe-area-inset-right));
+      bottom: max(14px, env(safe-area-inset-bottom));
+      z-index: 5;
+      width: 44px;
+      height: 44px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 50%;
+      color: #fff;
+      background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.045)),
+        rgba(8, 12, 18, 0.62);
+      box-shadow:
+        0 10px 30px rgba(0, 0, 0, 0.38),
+        inset 0 1px 0 rgba(255, 255, 255, 0.16);
+      backdrop-filter: blur(18px) saturate(145%);
+      -webkit-backdrop-filter: blur(18px) saturate(145%);
+      transition:
+        width 300ms cubic-bezier(.2, .8, .2, 1),
+        height 300ms cubic-bezier(.2, .8, .2, 1),
+        border-radius 300ms cubic-bezier(.2, .8, .2, 1),
+        background 220ms ease;
+    }
+
+    .info-shell.is-open {
+      width: min(430px, calc(100vw - 24px));
+      height: min(470px, calc(100vh - 24px));
+      border-radius: 20px;
+      background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.055)),
+        rgba(8, 12, 18, 0.72);
+    }
+
+    .info-toggle {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      z-index: 2;
+      width: 44px;
+      height: 44px;
+      border: 0;
+      border-radius: 50%;
+      color: #fff;
+      background: transparent;
+      font: 700 20px/1 "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+      cursor: pointer;
+      transition:
+        right 300ms cubic-bezier(.2, .8, .2, 1),
+        bottom 300ms cubic-bezier(.2, .8, .2, 1),
+        transform 220ms ease,
+        background 180ms ease;
+    }
+
+    .info-toggle:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .info-toggle:focus-visible {
+      outline: 2px solid rgba(80, 255, 255, 0.95);
+      outline-offset: -3px;
+    }
+
+    .info-shell.is-open .info-toggle {
+      right: 10px;
+      bottom: calc(100% - 54px);
+      transform: rotate(90deg);
+    }
+
+    .info-panel {
+      height: 100%;
+      padding: 24px 58px 24px 24px;
+      overflow: auto;
+      overscroll-behavior: contain;
+      opacity: 0;
+      transform: translateY(10px) scale(0.98);
+      pointer-events: none;
+      transition: opacity 170ms ease 30ms, transform 220ms ease 30ms;
+      font-family: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    .info-shell.is-open .info-panel {
+      opacity: 1;
+      transform: none;
+      pointer-events: auto;
+    }
+
+    .info-panel h1 {
+      margin: 0;
+      font-size: clamp(34px, 7vw, 52px);
+      line-height: 1;
+      letter-spacing: -0.05em;
+    }
+
+    .info-divider {
+      height: 1px;
+      margin: 18px 0 20px;
+      background: linear-gradient(90deg, rgba(80, 255, 255, 0.8), rgba(255, 255, 255, 0.12));
+    }
+
+    .info-section + .info-section {
+      margin-top: 22px;
+    }
+
+    .info-section h2 {
+      margin: 0 0 9px;
+      font-size: 15px;
+      font-weight: 800;
+      color: rgb(90, 255, 255);
+    }
+
+    .info-section ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .info-section li {
+      margin: 8px 0;
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .info-section strong {
+      color: #fff;
+      font-weight: 800;
+    }
+
+    .touch-controls {
+      position: fixed;
+      left: max(12px, env(safe-area-inset-left));
+      bottom: max(12px, env(safe-area-inset-bottom));
+      z-index: 3;
+      display: none;
+      gap: 10px;
+    }
+
+    .touch-controls button {
+      min-width: 82px;
+      min-height: 46px;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 10px;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.62);
+      font: inherit;
+      font-size: 13px;
+      touch-action: none;
+    }
+
+    .touch-controls button[data-active="true"] {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    @media (pointer: coarse) {
+      .touch-controls {
+        display: flex;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .info-shell.is-open {
+        width: calc(100vw - 24px);
+        height: min(520px, calc(100vh - 24px));
+      }
+
+      .info-panel {
+        padding: 22px 54px 22px 20px;
+      }
+
+      .touch-controls button {
+        min-width: 72px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .info-backdrop,
+      .info-shell,
+      .info-toggle,
+      .info-panel {
+        transition-duration: 1ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game" aria-label="Cubes game canvas"></canvas>
+
+  <div class="touch-controls" aria-label="Touch controls">
+    <button id="shieldButton" type="button">Shield</button>
+    <button id="attackButton" type="button">Attack</button>
+  </div>
+
+  <div id="infoBackdrop" class="info-backdrop" hidden></div>
+  <aside id="infoShell" class="info-shell" aria-label="Game information">
+    <button
+      id="infoToggle"
+      class="info-toggle"
+      type="button"
+      aria-expanded="false"
+      aria-controls="infoPanel"
+      aria-label="Open game information"
+    >i</button>
+
+    <div id="infoPanel" class="info-panel" role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+      <h1 id="infoTitle">Info</h1>
+      <div class="info-divider" aria-hidden="true"></div>
+
+      <section class="info-section">
+        <h2>Controls</h2>
+        <ul>
+          <li><strong>Move pointer</strong> - Rotate and aim the central cube.</li>
+          <li><strong>Left click / Shield</strong> - Absorb incoming cubes and prevent damage. Shielding slowly costs score.</li>
+          <li><strong>Right click / Attack</strong> - Project the red face outward. Keep enemies inside the field until they overheat.</li>
+          <li><strong>Space / Click</strong> - Respawn after game over.</li>
+        </ul>
+      </section>
+
+      <section class="info-section">
+        <h2>Gameplay</h2>
+        <ul>
+          <li><strong>Red field</strong> - Its heating speed increases as the red face turns closer to edge-on.</li>
+          <li><strong>Enemy impact</strong> - An unshielded collision removes one health point and causes an impact burst.</li>
+          <li><strong>Score</strong> - Destroy enemies to earn points. The spawn rate rises as your score grows.</li>
+          <li><strong>Health</strong> - Reach zero health and the cube shatters. Respawning begins a fresh run.</li>
+        </ul>
+      </section>
+    </div>
+  </aside>
+
+  <script>
+    "use strict";
+
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d", { alpha: false });
+    const shieldButton = document.getElementById("shieldButton");
+    const attackButton = document.getElementById("attackButton");
+    const infoBackdrop = document.getElementById("infoBackdrop");
+    const infoShell = document.getElementById("infoShell");
+    const infoToggle = document.getElementById("infoToggle");
+
+    const TAU = Math.PI * 2;
+    const BASE_WIDTH = 800;
+    const BASE_HEIGHT = 600;
+
+    let WIDTH = BASE_WIDTH;
+    let HEIGHT = BASE_HEIGHT;
+    let pixelRatio = 1;
+    let visualScale = 1;
+    let CUBEDISTANCE = 200;
+    let TARGET_EDGE_RAY_LENGTH = Math.hypot(WIDTH, HEIGHT) * 2;
+
+    let score = 0;
+    let health = 10;
+
+    const SCORE_DECREASE_INTERVAL = 1 / 5;
+    let scoreDecreaseTimer = SCORE_DECREASE_INTERVAL;
+    let absorbing = false;
+
+    const SPAWN_ORIGINAL_MIN_DELAY = 0.5;
+    const SPAWN_ORIGINAL_MAX_DELAY = 1.0;
+    let spawnMinDelay = SPAWN_ORIGINAL_MIN_DELAY;
+    let spawnMaxDelay = SPAWN_ORIGINAL_MAX_DELAY;
+
+    const BASE_HEAT_TIME = 1.0;
+    const MIN_HEAT_TIME = 0.25;
+    const COOL_TIME = 0.7;
+    const TARGET_DISABLED_TILT_DEGREES = 20.0;
+
+    const TARGET_RANGE_ALPHA = 34 / 255;
+    const TARGET_RANGE_OUTLINE_ALPHA = 90 / 255;
+
+    const STATE_PLAYING = "playing";
+    const STATE_DYING = "dying";
+    const STATE_GAMEOVER = "gameover";
+    const STATE_RESPAWNING = "respawning";
+
+    let gameState = STATE_PLAYING;
+    let stateTimer = 0;
+
+    const DEATH_DURATION = 1.15;
+    const RESPAWN_DURATION = 0.7;
+    const FLASH_FADE_SPEED = 900;
+    const GAMEOVER_FADE_DURATION = 0.45;
+    const STARTING_HEALTH = 10;
+
+    let cubeScale = 1;
+    let flashAlpha = 0;
+    let shakeMagnitude = 0;
+    let hitShakeTimer = 0;
+    const HIT_SHAKE_DURATION = 0.18;
+    const HIT_SHAKE_STRENGTH = 6;
+    let spinOffsetAngle = 0;
+    let respawnSpinStart = 0;
+
+    const vertices = [
+      [-1, -1, -1],
+      [1, -1, -1],
+      [1, 1, -1],
+      [-1, 1, -1],
+      [-1, -1, 1],
+      [1, -1, 1],
+      [1, 1, 1],
+      [-1, 1, 1]
+    ];
+
+    const edges = [
+      [0, 1], [1, 2], [2, 3], [3, 0],
+      [4, 5], [5, 6], [6, 7], [7, 4],
+      [0, 4], [1, 5], [2, 6], [3, 7]
+    ];
+
+    const faces = [
+      [0, 1, 2, 3],
+      [4, 5, 6, 7],
+      [0, 1, 5, 4],
+      [2, 3, 7, 6],
+      [1, 2, 6, 5],
+      [0, 3, 7, 4]
+    ];
+
+    const COLOURED_FACE = faces[0];
+    const COLOURED_FACE_DEPTH_EDGES = [
+      [0, 4],
+      [1, 5],
+      [2, 6],
+      [3, 7]
+    ];
+
+    const DEATH_PALETTE = [
+      [80, 255, 255],
+      [255, 60, 60],
+      [255, 255, 255]
+    ];
+
+    const pointer = {
+      x: WIDTH / 2,
+      y: HEIGHT / 2,
+      smoothX: WIDTH / 2,
+      smoothY: HEIGHT / 2,
+      left: false,
+      right: false,
+      touchShield: false,
+      touchAttack: false
+    };
+
+    const smallCubes = [];
+    const particles = [];
+    const impactParticles = [];
+    const shatterParticles = [];
+    let spawnTimer = 0.5;
+
+    function randomRange(min, max) {
+      return min + Math.random() * (max - min);
+    }
+
+    function randomChoice(values) {
+      return values[Math.floor(Math.random() * values.length)];
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function smoothstep(value) {
+      const t = clamp(value, 0, 1);
+      return t * t * (3 - 2 * t);
+    }
+
+    function rotateX(point, angle) {
+      const [x, y, z] = point;
+      const c = Math.cos(angle);
+      const s = Math.sin(angle);
+      return [x, y * c - z * s, y * s + z * c];
+    }
+
+    function rotateY(point, angle) {
+      const [x, y, z] = point;
+      const c = Math.cos(angle);
+      const s = Math.sin(angle);
+      return [x * c + z * s, y, -x * s + z * c];
+    }
+
+    function rotateZ(point, angle) {
+      const [x, y, z] = point;
+      const c = Math.cos(angle);
+      const s = Math.sin(angle);
+      return [x * c - y * s, x * s + y * c, z];
+    }
+
+    function rotatePoint(point, angleX, angleY, angleZ) {
+      return rotateZ(rotateY(rotateX(point, angleX), angleY), angleZ);
+    }
+
+    function projectFloat(point, scale = 1) {
+      const [x, y, rawZ] = point;
+      let z = rawZ + 5;
+      if (Math.abs(z) < 0.001) {
+        z = z >= 0 ? 0.001 : -0.001;
+      }
+      const factor = (CUBEDISTANCE * scale) / z;
+      return [WIDTH / 2 + x * factor, HEIGHT / 2 - y * factor];
+    }
+
+    function crossProduct(origin, pointA, pointB) {
+      return (
+        (pointA[0] - origin[0]) * (pointB[1] - origin[1]) -
+        (pointA[1] - origin[1]) * (pointB[0] - origin[0])
+      );
+    }
+
+    function convexHull(points) {
+      const uniqueMap = new Map();
+      for (const point of points) {
+        const key = `${point[0].toFixed(5)},${point[1].toFixed(5)}`;
+        uniqueMap.set(key, point);
+      }
+
+      const sorted = [...uniqueMap.values()].sort((a, b) => {
+        if (a[0] !== b[0]) return a[0] - b[0];
+        return a[1] - b[1];
+      });
+
+      if (sorted.length <= 1) return sorted;
+
+      const lower = [];
+      for (const point of sorted) {
+        while (
+          lower.length >= 2 &&
+          crossProduct(lower[lower.length - 2], lower[lower.length - 1], point) <= 0
+        ) {
+          lower.pop();
+        }
+        lower.push(point);
+      }
+
+      const upper = [];
+      for (let i = sorted.length - 1; i >= 0; i -= 1) {
+        const point = sorted[i];
+        while (
+          upper.length >= 2 &&
+          crossProduct(upper[upper.length - 2], upper[upper.length - 1], point) <= 0
+        ) {
+          upper.pop();
+        }
+        upper.push(point);
+      }
+
+      return lower.slice(0, -1).concat(upper.slice(0, -1));
+    }
+
+    function pointInsideConvexPolygon(point, polygon) {
+      if (polygon.length < 3) return false;
+      for (let i = 0; i < polygon.length; i += 1) {
+        const start = polygon[i];
+        const end = polygon[(i + 1) % polygon.length];
+        if (crossProduct(start, end, point) < -0.001) return false;
+      }
+      return true;
+    }
+
+    function getHeatTimeForTilt(tiltDegrees) {
+      const horizontalAmount = clamp(
+        (tiltDegrees - TARGET_DISABLED_TILT_DEGREES) /
+          (90 - TARGET_DISABLED_TILT_DEGREES),
+        0,
+        1
+      );
+      return BASE_HEAT_TIME + (MIN_HEAT_TIME - BASE_HEAT_TIME) * horizontalAmount;
+    }
+
+    function getRedFaceTargetingRegion(rotated, projected) {
+      const faceCenter = [0, 0, 0];
+      for (const index of COLOURED_FACE) {
+        faceCenter[0] += rotated[index][0] / COLOURED_FACE.length;
+        faceCenter[1] += rotated[index][1] / COLOURED_FACE.length;
+        faceCenter[2] += rotated[index][2] / COLOURED_FACE.length;
+      }
+
+      const normalLength = Math.hypot(faceCenter[0], faceCenter[1], faceCenter[2]);
+      const normal = normalLength === 0
+        ? [0, 0, -1]
+        : faceCenter.map((component) => component / normalLength);
+
+      const facingAmount = clamp(-normal[2], -1, 1);
+      const tiltDegrees = Math.acos(facingAmount) * 180 / Math.PI;
+      const targetingEnabled = tiltDegrees > TARGET_DISABLED_TILT_DEGREES;
+
+      if (!targetingEnabled) {
+        return { polygon: [], enabled: false, tiltDegrees };
+      }
+
+      const facePoints = COLOURED_FACE.map((index) => projected[index]);
+      const extendedPoints = [];
+
+      for (const [frontIndex, backIndex] of COLOURED_FACE_DEPTH_EDGES) {
+        const frontPoint = projected[frontIndex];
+        const backPoint = projected[backIndex];
+        let directionX = frontPoint[0] - backPoint[0];
+        let directionY = frontPoint[1] - backPoint[1];
+        const directionLength = Math.hypot(directionX, directionY);
+
+        if (directionLength < 0.001) continue;
+
+        directionX /= directionLength;
+        directionY /= directionLength;
+        extendedPoints.push([
+          frontPoint[0] + directionX * TARGET_EDGE_RAY_LENGTH,
+          frontPoint[1] + directionY * TARGET_EDGE_RAY_LENGTH
+        ]);
+      }
+
+      if (extendedPoints.length === 0) {
+        return { polygon: [], enabled: false, tiltDegrees };
+      }
+
+      return {
+        polygon: convexHull(facePoints.concat(extendedPoints)),
+        enabled: true,
+        tiltDegrees
+      };
+    }
+
+    function projectPolygonOntoAxis(polygon, axisX, axisY) {
+      let min = Infinity;
+      let max = -Infinity;
+      for (const point of polygon) {
+        const projection = point[0] * axisX + point[1] * axisY;
+        min = Math.min(min, projection);
+        max = Math.max(max, projection);
+      }
+      return [min, max];
+    }
+
+    function polygonsIntersect(polygonA, polygonB) {
+      if (polygonA.length < 3 || polygonB.length < 3) return false;
+
+      for (const polygon of [polygonA, polygonB]) {
+        for (let i = 0; i < polygon.length; i += 1) {
+          const start = polygon[i];
+          const end = polygon[(i + 1) % polygon.length];
+          const edgeX = end[0] - start[0];
+          const edgeY = end[1] - start[1];
+          const axisX = -edgeY;
+          const axisY = edgeX;
+
+          const [minA, maxA] = projectPolygonOntoAxis(polygonA, axisX, axisY);
+          const [minB, maxB] = projectPolygonOntoAxis(polygonB, axisX, axisY);
+
+          if (maxA < minB || maxB < minA) return false;
+        }
+      }
+      return true;
+    }
+
+    function beginPolygon(points) {
+      if (points.length === 0) return false;
+      ctx.beginPath();
+      ctx.moveTo(points[0][0], points[0][1]);
+      for (let i = 1; i < points.length; i += 1) {
+        ctx.lineTo(points[i][0], points[i][1]);
+      }
+      ctx.closePath();
+      return true;
+    }
+
+    function fillPolygon(points, color) {
+      if (!beginPolygon(points)) return;
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+
+    function strokePolygon(points, color, lineWidth) {
+      if (!beginPolygon(points)) return;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.stroke();
+    }
+
+    function drawTargetingRegion(polygon) {
+      fillPolygon(polygon, `rgba(255,45,45,${TARGET_RANGE_ALPHA})`);
+      strokePolygon(
+        polygon,
+        `rgba(255,80,80,${TARGET_RANGE_OUTLINE_ALPHA})`,
+        Math.max(1.5, 2 * visualScale)
+      );
+    }
+
+    class SmallCube {
+      constructor() {
+        const margin = 30 * visualScale;
+        const screenEdge = Math.floor(Math.random() * 4);
+
+        if (screenEdge === 0) {
+          this.x = randomRange(0, WIDTH);
+          this.y = -margin;
+        } else if (screenEdge === 1) {
+          this.x = WIDTH + margin;
+          this.y = randomRange(0, HEIGHT);
+        } else if (screenEdge === 2) {
+          this.x = randomRange(0, WIDTH);
+          this.y = HEIGHT + margin;
+        } else {
+          this.x = -margin;
+          this.y = randomRange(0, HEIGHT);
+        }
+
+        const targetSpread = 35 * visualScale;
+        const targetX = WIDTH / 2 + randomRange(-targetSpread, targetSpread);
+        const targetY = HEIGHT / 2 + randomRange(-targetSpread, targetSpread);
+        const dx = targetX - this.x;
+        const dy = targetY - this.y;
+        const distance = Math.max(0.001, Math.hypot(dx, dy));
+        const speed = randomRange(70, 120) * visualScale;
+
+        this.vx = dx / distance * speed;
+        this.vy = dy / distance * speed;
+        this.size = randomRange(10, 17) * visualScale;
+
+        this.angleX = randomRange(0, TAU);
+        this.angleY = randomRange(0, TAU);
+        this.angleZ = randomRange(0, TAU);
+
+        this.rotationX = randomChoice([-1, 1]) * randomRange(0.7, 2.0);
+        this.rotationY = randomChoice([-1, 1]) * randomRange(0.7, 2.0);
+        this.rotationZ = randomChoice([-1, 1]) * randomRange(0.4, 1.5);
+        this.heat = 0;
+      }
+
+      resize(scaleX, scaleY, scaleAverage) {
+        this.x *= scaleX;
+        this.y *= scaleY;
+        this.vx *= scaleX;
+        this.vy *= scaleY;
+        this.size *= scaleAverage;
+      }
+
+      update(dt, beingHeated, heatTime) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.angleX += this.rotationX * dt;
+        this.angleY += this.rotationY * dt;
+        this.angleZ += this.rotationZ * dt;
+
+        if (beingHeated) {
+          this.heat += dt / heatTime;
+        } else {
+          this.heat -= dt / COOL_TIME;
+        }
+        this.heat = clamp(this.heat, 0, 1);
+      }
+
+      getProjectedPoints() {
+        const rotatedPoints = [];
+        const projectedPoints = [];
+
+        for (const vertex of vertices) {
+          const point = rotatePoint(vertex, this.angleX, this.angleY, this.angleZ);
+          rotatedPoints.push(point);
+
+          const [x, y, z] = point;
+          const distance = 4;
+          const factor = this.size * 3 / (z + distance);
+          projectedPoints.push([this.x + x * factor, this.y - y * factor]);
+        }
+
+        return { rotatedPoints, projectedPoints };
+      }
+
+      isFullyInside(mainOutline) {
+        const { projectedPoints } = this.getProjectedPoints();
+        return projectedPoints.every((point) => pointInsideConvexPolygon(point, mainOutline));
+      }
+
+      isHitByTargetingRegion(targetingPolygon) {
+        const { projectedPoints } = this.getProjectedPoints();
+        return polygonsIntersect(targetingPolygon, convexHull(projectedPoints));
+      }
+
+      draw() {
+        const { rotatedPoints, projectedPoints } = this.getProjectedPoints();
+        const greenBlue = Math.floor(255 * (1 - this.heat));
+        const edgeColor = `rgb(255,${greenBlue},${greenBlue})`;
+        const faceColor = `rgb(${Math.floor(255 * 0.35)},${Math.floor(greenBlue * 0.35)},${Math.floor(greenBlue * 0.35)})`;
+
+        const faceList = faces.map((face) => ({
+          averageZ: face.reduce((sum, index) => sum + rotatedPoints[index][2], 0) / face.length,
+          points: face.map((index) => projectedPoints[index])
+        }));
+        faceList.sort((a, b) => b.averageZ - a.averageZ);
+
+        for (const face of faceList) fillPolygon(face.points, faceColor);
+
+        ctx.strokeStyle = edgeColor;
+        ctx.lineWidth = Math.max(1.25, 2 * visualScale);
+        ctx.beginPath();
+        for (const [start, end] of edges) {
+          ctx.moveTo(projectedPoints[start][0], projectedPoints[start][1]);
+          ctx.lineTo(projectedPoints[end][0], projectedPoints[end][1]);
+        }
+        ctx.stroke();
+      }
+
+      isOffscreen() {
+        const margin = 100 * visualScale;
+        return (
+          this.x < -margin ||
+          this.x > WIDTH + margin ||
+          this.y < -margin ||
+          this.y > HEIGHT + margin
+        );
+      }
+    }
+
+    class ExplosionParticle {
+      constructor(x, y) {
+        const angle = randomRange(0, TAU);
+        const speed = randomRange(80, 230) * visualScale;
+        this.x = x;
+        this.y = y;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+        this.life = randomRange(0.35, 0.75);
+        this.maximumLife = this.life;
+        this.size = randomRange(2, 4) * visualScale;
+      }
+
+      resize(scaleX, scaleY, scaleAverage) {
+        this.x *= scaleX;
+        this.y *= scaleY;
+        this.vx *= scaleX;
+        this.vy *= scaleY;
+        this.size *= scaleAverage;
+      }
+
+      update(dt) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        const drag = Math.pow(0.97, dt * 60);
+        this.vx *= drag;
+        this.vy *= drag;
+        this.life -= dt;
+        return this.life > 0;
+      }
+
+      draw() {
+        const brightness = this.life / this.maximumLife;
+        ctx.fillStyle = `rgb(${Math.floor(255 * brightness)},${Math.floor(90 * brightness)},${Math.floor(25 * brightness)})`;
+        ctx.beginPath();
+        ctx.arc(
+          this.x,
+          this.y,
+          Math.max(1, this.size * brightness),
+          0,
+          TAU
+        );
+        ctx.fill();
+      }
+    }
+
+    class ImpactParticle {
+      constructor(x, y) {
+        const angle = randomRange(0, TAU);
+        const speed = randomRange(95, 280) * visualScale;
+        this.x = x;
+        this.y = y;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+        this.life = randomRange(0.2, 0.48);
+        this.maximumLife = this.life;
+        this.length = randomRange(4, 11) * visualScale;
+        this.width = randomRange(1.2, 2.6) * visualScale;
+        this.color = randomChoice([
+          [80, 255, 255],
+          [255, 70, 70],
+          [255, 255, 255]
+        ]);
+      }
+
+      resize(scaleX, scaleY, scaleAverage) {
+        this.x *= scaleX;
+        this.y *= scaleY;
+        this.vx *= scaleX;
+        this.vy *= scaleY;
+        this.length *= scaleAverage;
+        this.width *= scaleAverage;
+      }
+
+      update(dt) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        const drag = Math.pow(0.93, dt * 60);
+        this.vx *= drag;
+        this.vy *= drag;
+        this.life -= dt;
+        return this.life > 0;
+      }
+
+      draw() {
+        const progress = clamp(this.life / this.maximumLife, 0, 1);
+        const [r, g, b] = this.color;
+        const speed = Math.max(0.001, Math.hypot(this.vx, this.vy));
+        const dx = this.vx / speed * this.length * progress;
+        const dy = this.vy / speed * this.length * progress;
+
+        ctx.globalAlpha = progress;
+        ctx.strokeStyle = `rgb(${r},${g},${b})`;
+        ctx.lineWidth = Math.max(1, this.width * progress);
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x - dx, this.y - dy);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    class ShardParticle {
+      constructor(x, y) {
+        const angle = randomRange(0, TAU);
+        const speed = randomRange(90, 420) * visualScale;
+        this.x = x;
+        this.y = y;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+        this.spin = randomRange(-12, 12);
+        this.rotation = randomRange(0, TAU);
+        this.life = randomRange(0.6, 1.2);
+        this.maximumLife = this.life;
+        this.length = randomRange(6, 16) * visualScale;
+        this.color = randomChoice(DEATH_PALETTE);
+      }
+
+      resize(scaleX, scaleY, scaleAverage) {
+        this.x *= scaleX;
+        this.y *= scaleY;
+        this.vx *= scaleX;
+        this.vy *= scaleY;
+        this.length *= scaleAverage;
+      }
+
+      update(dt) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        const drag = Math.pow(0.985, dt * 60);
+        this.vx *= drag;
+        this.vy *= drag;
+        this.rotation += this.spin * dt;
+        this.life -= dt;
+        return this.life > 0;
+      }
+
+      draw() {
+        const brightness = this.life / this.maximumLife;
+        const [r, g, b] = this.color;
+        const halfLength = this.length * brightness / 2;
+        const dx = Math.cos(this.rotation) * halfLength;
+        const dy = Math.sin(this.rotation) * halfLength;
+
+        ctx.strokeStyle = `rgb(${Math.floor(r * brightness)},${Math.floor(g * brightness)},${Math.floor(b * brightness)})`;
+        ctx.lineWidth = Math.max(1.25, 2 * visualScale);
+        ctx.beginPath();
+        ctx.moveTo(this.x - dx, this.y - dy);
+        ctx.lineTo(this.x + dx, this.y + dy);
+        ctx.stroke();
+      }
+    }
+
+    function createExplosion(x, y) {
+      for (let i = 0; i < 24; i += 1) particles.push(new ExplosionParticle(x, y));
+    }
+
+    function createImpactBurst(x, y) {
+      for (let i = 0; i < 22; i += 1) impactParticles.push(new ImpactParticle(x, y));
+      hitShakeTimer = HIT_SHAKE_DURATION;
+    }
+
+    function createDeathShatter(x, y) {
+      shatterParticles.length = 0;
+      for (let i = 0; i < 70; i += 1) shatterParticles.push(new ShardParticle(x, y));
+    }
+
+    function respawn() {
+      score = 0;
+      health = STARTING_HEALTH;
+      scoreDecreaseTimer = SCORE_DECREASE_INTERVAL;
+      absorbing = false;
+      smallCubes.length = 0;
+      particles.length = 0;
+      impactParticles.length = 0;
+      shatterParticles.length = 0;
+      hitShakeTimer = 0;
+      spawnMinDelay = SPAWN_ORIGINAL_MIN_DELAY;
+      spawnMaxDelay = SPAWN_ORIGINAL_MAX_DELAY;
+      spawnTimer = 0.6;
+      cubeScale = 0;
+      flashAlpha = 0;
+      respawnSpinStart = spinOffsetAngle;
+      gameState = STATE_RESPAWNING;
+      stateTimer = 0;
+    }
+
+    function triggerDeath() {
+      smallCubes.length = 0;
+      createDeathShatter(WIDTH / 2, HEIGHT / 2);
+      gameState = STATE_DYING;
+      stateTimer = 0;
+      spinOffsetAngle = 0;
+      flashAlpha = 235;
+    }
+
+    function drawCentralCubeEdges(projected) {
+      let color;
+      const left = pointer.left || pointer.touchShield;
+      const right = pointer.right || pointer.touchAttack;
+
+      if (gameState === STATE_PLAYING) {
+        color = right && !left ? [255, 0, 0] : [0, 255, 255];
+      } else if (gameState === STATE_DYING) {
+        const fade = 1 - cubeScale;
+        color = [255, 255 * (1 - fade), 255 * (1 - fade)];
+      } else if (gameState === STATE_RESPAWNING) {
+        color = [0, 255 * cubeScale, 255 * cubeScale];
+      } else {
+        color = [0, 0, 0];
+      }
+
+      ctx.strokeStyle = `rgb(${Math.floor(color[0])},${Math.floor(color[1])},${Math.floor(color[2])})`;
+      ctx.lineWidth = Math.max(1.25, 2 * visualScale);
+      ctx.beginPath();
+      for (const [start, end] of edges) {
+        ctx.moveTo(projected[start][0], projected[start][1]);
+        ctx.lineTo(projected[end][0], projected[end][1]);
+      }
+      ctx.stroke();
+    }
+
+    function drawHud() {
+      const fontSize = clamp(30 * visualScale, 18, 38);
+      const margin = clamp(10 * visualScale, 8, 16);
+      ctx.font = `${fontSize}px "Cascadia Code", "SFMono-Regular", Consolas, monospace`;
+      ctx.textBaseline = "top";
+      ctx.fillStyle = "white";
+      ctx.textAlign = "left";
+      ctx.fillText(String(score), margin, margin);
+      ctx.textAlign = "right";
+      ctx.fillText(`${Math.max(0, health)}hp`, WIDTH - margin, margin);
+    }
+
+    function drawGameOver() {
+      const fadeIn = smoothstep(stateTimer / GAMEOVER_FADE_DURATION);
+      const pulse = (Math.sin(stateTimer * 3.2) + 1) / 2;
+
+      ctx.fillStyle = `rgba(0,0,0,${(165 / 255) * fadeIn})`;
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+      const titleSize = clamp(56 * visualScale, 30, 68);
+      const promptSize = clamp(24 * visualScale, 15, 30);
+      const titleY = HEIGHT / 2 - 50 * visualScale - 12 * visualScale * (1 - fadeIn);
+
+      ctx.globalAlpha = fadeIn;
+      ctx.font = `${titleSize}px "Cascadia Code", "SFMono-Regular", Consolas, monospace`;
+      ctx.textBaseline = "top";
+
+      const gameOverText = "GAME OVER";
+      const scoreText = ` ${score}`;
+      const gameOverWidth = ctx.measureText(gameOverText).width;
+      const scoreWidth = ctx.measureText(scoreText).width;
+      const leftX = WIDTH / 2 - (gameOverWidth + scoreWidth) / 2;
+
+      ctx.textAlign = "left";
+      ctx.fillStyle = "rgb(255,0,0)";
+      ctx.fillText(gameOverText, leftX, titleY);
+      ctx.fillStyle = "white";
+      ctx.fillText(scoreText, leftX + gameOverWidth, titleY);
+
+      ctx.font = `${promptSize}px "Cascadia Code", "SFMono-Regular", Consolas, monospace`;
+      ctx.globalAlpha = fadeIn * ((140 + 115 * pulse) / 255);
+      ctx.fillStyle = "rgb(0,255,255)";
+      ctx.fillText("Press SPACE or click to Respawn", leftX, titleY + titleSize + 18 * visualScale);
+      ctx.globalAlpha = 1;
+    }
+
+    function updateAndDraw(dt) {
+      let shakeX = 0;
+      let shakeY = 0;
+
+      if (gameState === STATE_DYING) {
+        stateTimer += dt;
+        cubeScale = Math.max(0, 1 - stateTimer / DEATH_DURATION);
+        spinOffsetAngle += dt * 7;
+        const shakeProgress = Math.max(0, 1 - stateTimer / DEATH_DURATION);
+        shakeMagnitude = 16 * visualScale * shakeProgress;
+        shakeX = randomRange(-shakeMagnitude, shakeMagnitude);
+        shakeY = randomRange(-shakeMagnitude, shakeMagnitude);
+        flashAlpha = Math.max(0, flashAlpha - FLASH_FADE_SPEED * dt);
+
+        if (stateTimer >= DEATH_DURATION) {
+          gameState = STATE_GAMEOVER;
+          stateTimer = 0;
+          cubeScale = 0;
+        }
+      } else if (gameState === STATE_RESPAWNING) {
+        stateTimer += dt;
+        const respawnProgress = Math.min(1, stateTimer / RESPAWN_DURATION);
+        const easedProgress = smoothstep(respawnProgress);
+        cubeScale = easedProgress;
+        spinOffsetAngle = respawnSpinStart * (1 - easedProgress);
+
+        if (stateTimer >= RESPAWN_DURATION) {
+          gameState = STATE_PLAYING;
+          cubeScale = 1;
+          spinOffsetAngle = 0;
+          stateTimer = 0;
+        }
+      } else if (gameState === STATE_GAMEOVER) {
+        stateTimer += dt;
+      }
+
+      if (hitShakeTimer > 0) {
+        const hitProgress = clamp(hitShakeTimer / HIT_SHAKE_DURATION, 0, 1);
+        const hitStrength = HIT_SHAKE_STRENGTH * visualScale * hitProgress;
+        shakeX += randomRange(-hitStrength, hitStrength);
+        shakeY += randomRange(-hitStrength, hitStrength);
+        shakeMagnitude = Math.max(shakeMagnitude, hitStrength);
+        hitShakeTimer = Math.max(0, hitShakeTimer - dt);
+      } else if (gameState !== STATE_DYING) {
+        shakeMagnitude = 0;
+      }
+
+      pointer.smoothX += (pointer.x - pointer.smoothX) * 0.3;
+      pointer.smoothY += (pointer.y - pointer.smoothY) * 0.3;
+
+      let left = pointer.left || pointer.touchShield;
+      let right = pointer.right || pointer.touchAttack;
+      if (gameState !== STATE_PLAYING) {
+        left = false;
+        right = false;
+      }
+      if (left) right = false;
+      absorbing = gameState === STATE_PLAYING && left;
+
+      const yaw = -Math.atan((pointer.smoothX - WIDTH / 2) / CUBEDISTANCE);
+      const pitch = -Math.atan((pointer.smoothY - HEIGHT / 2) / CUBEDISTANCE);
+
+      const rotated = [];
+      const projected = [];
+      for (const vertex of vertices) {
+        let point = rotateX(vertex, pitch);
+        point = rotateY(point, yaw);
+        point = rotateZ(point, spinOffsetAngle);
+        rotated.push(point);
+        projected.push(projectFloat(point, cubeScale));
+      }
+
+      const mainOutline = convexHull(projected);
+      const targeting = getRedFaceTargetingRegion(rotated, projected);
+      const targetingActive = (
+        gameState === STATE_PLAYING &&
+        right &&
+        !left &&
+        targeting.enabled
+      );
+      const currentHeatTime = getHeatTimeForTilt(targeting.tiltDegrees);
+
+      if (gameState === STATE_PLAYING) {
+        spawnTimer -= dt;
+        if (spawnTimer <= 0) {
+          smallCubes.push(new SmallCube());
+          spawnTimer = randomRange(spawnMinDelay, spawnMaxDelay);
+        }
+
+        const survivingCubes = [];
+        let playerDiedThisFrame = false;
+
+        for (const cube of smallCubes) {
+          const beingHeated = targetingActive && cube.isHitByTargetingRegion(targeting.polygon);
+          cube.update(dt, beingHeated, currentHeatTime);
+
+          if (cube.heat >= 1) {
+            createExplosion(cube.x, cube.y);
+            score += 1;
+            continue;
+          }
+
+          if (cube.isFullyInside(mainOutline)) {
+            if (!absorbing) {
+              health -= 1;
+              createImpactBurst(cube.x, cube.y);
+              if (health <= 0) playerDiedThisFrame = true;
+            }
+            continue;
+          }
+
+          if (!cube.isOffscreen()) survivingCubes.push(cube);
+        }
+
+        smallCubes.length = 0;
+        if (playerDiedThisFrame) {
+          triggerDeath();
+        } else {
+          smallCubes.push(...survivingCubes);
+        }
+      }
+
+      for (let i = particles.length - 1; i >= 0; i -= 1) {
+        if (!particles[i].update(dt)) particles.splice(i, 1);
+      }
+      for (let i = impactParticles.length - 1; i >= 0; i -= 1) {
+        if (!impactParticles[i].update(dt)) impactParticles.splice(i, 1);
+      }
+      for (let i = shatterParticles.length - 1; i >= 0; i -= 1) {
+        if (!shatterParticles[i].update(dt)) shatterParticles.splice(i, 1);
+      }
+
+      ctx.save();
+      ctx.translate(shakeX, shakeY);
+      ctx.fillStyle = "black";
+      ctx.fillRect(-shakeMagnitude - 2, -shakeMagnitude - 2, WIDTH + shakeMagnitude * 2 + 4, HEIGHT + shakeMagnitude * 2 + 4);
+
+      if (targetingActive) drawTargetingRegion(targeting.polygon);
+
+      drawCentralCubeEdges(projected);
+
+      for (const particle of particles) particle.draw();
+      for (const particle of shatterParticles) particle.draw();
+      for (const cube of smallCubes) cube.draw();
+
+      if (gameState === STATE_PLAYING) {
+        const faceList = faces.map((face) => ({
+          averageZ: face.reduce((sum, index) => sum + rotated[index][2], 0) / face.length,
+          points: face.map((index) => projected[index])
+        }));
+        faceList.sort((a, b) => b.averageZ - a.averageZ);
+
+        if (left) {
+          for (const face of faceList) fillPolygon(face.points, "rgb(60,255,255)");
+          absorbing = true;
+        } else if (right) {
+          fillPolygon(COLOURED_FACE.map((index) => projected[index]), "rgb(255,30,30)");
+        }
+
+        if (!left) absorbing = false;
+
+        if (absorbing) {
+          scoreDecreaseTimer -= dt;
+          while (scoreDecreaseTimer <= 0) {
+            score -= 1;
+            scoreDecreaseTimer += SCORE_DECREASE_INTERVAL;
+          }
+        } else {
+          scoreDecreaseTimer = Math.min(scoreDecreaseTimer, SCORE_DECREASE_INTERVAL);
+        }
+
+        spawnMinDelay = Math.max(SPAWN_ORIGINAL_MIN_DELAY - score * 0.002, 0);
+        spawnMaxDelay = Math.max(SPAWN_ORIGINAL_MAX_DELAY - score * 0.002, 0);
+      }
+
+      for (const particle of impactParticles) particle.draw();
+
+      if (flashAlpha > 0) {
+        ctx.fillStyle = `rgba(255,255,255,${flashAlpha / 255})`;
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      }
+
+      drawHud();
+      if (gameState === STATE_GAMEOVER) drawGameOver();
+
+      ctx.restore();
+    }
+
+    function resizeCanvas() {
+      const oldWidth = WIDTH;
+      const oldHeight = HEIGHT;
+      const rect = canvas.getBoundingClientRect();
+      WIDTH = Math.max(280, rect.width || window.innerWidth || BASE_WIDTH);
+      HEIGHT = Math.max(240, rect.height || window.innerHeight || BASE_HEIGHT);
+      pixelRatio = Math.min(window.devicePixelRatio || 1, 2.5);
+
+      canvas.width = Math.round(WIDTH * pixelRatio);
+      canvas.height = Math.round(HEIGHT * pixelRatio);
+      ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+
+      visualScale = clamp(Math.min(WIDTH / BASE_WIDTH, HEIGHT / BASE_HEIGHT), 0.55, 1.8);
+      CUBEDISTANCE = 200 * visualScale;
+      TARGET_EDGE_RAY_LENGTH = Math.hypot(WIDTH, HEIGHT) * 2;
+
+      if (oldWidth > 0 && oldHeight > 0 && (oldWidth !== WIDTH || oldHeight !== HEIGHT)) {
+        const scaleX = WIDTH / oldWidth;
+        const scaleY = HEIGHT / oldHeight;
+        const scaleAverage = Math.sqrt(scaleX * scaleY);
+
+        pointer.x *= scaleX;
+        pointer.y *= scaleY;
+        pointer.smoothX *= scaleX;
+        pointer.smoothY *= scaleY;
+
+        for (const cube of smallCubes) cube.resize(scaleX, scaleY, scaleAverage);
+        for (const particle of particles) particle.resize(scaleX, scaleY, scaleAverage);
+        for (const particle of impactParticles) particle.resize(scaleX, scaleY, scaleAverage);
+        for (const shard of shatterParticles) shard.resize(scaleX, scaleY, scaleAverage);
+      }
+    }
+
+    function pointerPosition(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: clamp(event.clientX - rect.left, 0, rect.width),
+        y: clamp(event.clientY - rect.top, 0, rect.height)
+      };
+    }
+
+    canvas.addEventListener("pointermove", (event) => {
+      const position = pointerPosition(event);
+      pointer.x = position.x;
+      pointer.y = position.y;
+    });
+
+    canvas.addEventListener("pointerdown", (event) => {
+      const position = pointerPosition(event);
+      pointer.x = position.x;
+      pointer.y = position.y;
+
+      if (gameState === STATE_GAMEOVER && (event.pointerType === "touch" || event.button === 0)) {
+        respawn();
+        return;
+      }
+
+      if (event.pointerType === "touch") {
+        canvas.setPointerCapture?.(event.pointerId);
+        return;
+      }
+
+      if (event.button === 0) pointer.left = true;
+      if (event.button === 2) pointer.right = true;
+    });
+
+    function releasePointerButton(event) {
+      if (event.button === 0) pointer.left = false;
+      if (event.button === 2) pointer.right = false;
+    }
+
+    canvas.addEventListener("pointerup", releasePointerButton);
+    canvas.addEventListener("pointercancel", releasePointerButton);
+    window.addEventListener("pointerup", releasePointerButton);
+    window.addEventListener("pointercancel", releasePointerButton);
+    canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+
+    window.addEventListener("blur", () => {
+      pointer.left = false;
+      pointer.right = false;
+      pointer.touchShield = false;
+      pointer.touchAttack = false;
+      shieldButton.dataset.active = "false";
+      attackButton.dataset.active = "false";
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.code === "Space") {
+        event.preventDefault();
+        if (gameState === STATE_GAMEOVER) respawn();
+      }
+    });
+
+    function bindHoldButton(button, stateKey) {
+      const setState = (active, event) => {
+        event.preventDefault();
+        pointer[stateKey] = active;
+        button.dataset.active = String(active);
+      };
+
+      button.addEventListener("pointerdown", (event) => {
+        button.setPointerCapture?.(event.pointerId);
+        setState(true, event);
+      });
+      button.addEventListener("pointerup", (event) => setState(false, event));
+      button.addEventListener("pointercancel", (event) => setState(false, event));
+      button.addEventListener("lostpointercapture", () => {
+        pointer[stateKey] = false;
+        button.dataset.active = "false";
+      });
+    }
+
+    bindHoldButton(shieldButton, "touchShield");
+    bindHoldButton(attackButton, "touchAttack");
+
+    let infoOpen = false;
+
+    function setInfoOpen(open) {
+      infoOpen = open;
+      infoToggle.setAttribute("aria-expanded", String(open));
+      infoToggle.setAttribute("aria-label", open ? "Close game information" : "Open game information");
+      infoToggle.textContent = open ? "×" : "i";
+
+      if (open) {
+        infoBackdrop.hidden = false;
+        requestAnimationFrame(() => {
+          infoBackdrop.classList.add("is-open");
+          infoShell.classList.add("is-open");
+        });
+      } else {
+        infoBackdrop.classList.remove("is-open");
+        infoShell.classList.remove("is-open");
+        window.setTimeout(() => {
+          if (!infoOpen) infoBackdrop.hidden = true;
+        }, 230);
+      }
+    }
+
+    infoToggle.addEventListener("click", () => setInfoOpen(!infoOpen));
+    infoBackdrop.addEventListener("click", () => setInfoOpen(false));
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && infoOpen) {
+        event.preventDefault();
+        setInfoOpen(false);
+        infoToggle.focus();
+      }
+    });
+
+    const resizeObserver = new ResizeObserver(resizeCanvas);
+    resizeObserver.observe(canvas);
+    window.addEventListener("resize", resizeCanvas, { passive: true });
+    resizeCanvas();
+
+    let previousTimestamp = performance.now();
+
+    function frame(timestamp) {
+      const dt = Math.min(0.05, Math.max(0, (timestamp - previousTimestamp) / 1000));
+      previousTimestamp = timestamp;
+      updateAndDraw(dt);
+      requestAnimationFrame(frame);
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      previousTimestamp = performance.now();
+    });
+
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
