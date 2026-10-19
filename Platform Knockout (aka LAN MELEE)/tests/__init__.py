@@ -1,0 +1,1 @@
+"""LAN Melee automated tests."""

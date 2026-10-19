@@ -1,0 +1,102 @@
+"""Shared game, network, and input constants."""
+
+from __future__ import annotations
+
+WIDTH = 600
+HEIGHT = 400
+FPS = 60
+FIXED_DT = 1.0 / FPS
+
+GAME_PORT = 47621
+DISCOVERY_PORT = 47620
+PROTOCOL_VERSION = 1
+MAX_PLAYERS = 12
+CLIENT_TIMEOUT = 5.0
+SNAPSHOT_RATE = 30
+INTERPOLATION_DELAY = 0.050
+
+PLAYER_WIDTH = 50
+PLAYER_HEIGHT = 50
+CROUCH_HEIGHT = 30
+ATTACK_WIDTH = 70
+ATTACK_HEIGHT = 40
+
+MOVE_SPEED = 7.0
+ACCELERATION = 5.0
+GROUND_FRICTION = 0.75
+AIR_FRICTION = 0.20
+GRAVITY = 0.75
+MAX_FALL_SPEED = 20.0
+JUMP_SPEED = -15.0
+DASH_POWER = 5
+DASH_FRAMES = 5
+DASH_COOLDOWN_FRAMES = 36
+ATTACK_FRAMES = 18
+ATTACK_COOLDOWN_FRAMES = 22
+ATTACK_DAMAGE = 34
+KNOCKBACK_X = 11.0
+KNOCKBACK_Y = -6.0
+ROUND_OVER_SECONDS = 3.0
+
+SOLID_PLATFORMS = (
+    (100, 300, 200, 20),
+    (350, 250, 150, 20),
+    (520, 350, 50, 20),
+)
+
+PASSABLE_PLATFORMS = (
+    (200, 180, 120, 20),
+    (500, 350, 20, 20),
+)
+
+SPAWN_POINTS = (
+    (24, 245),
+    (526, 295),
+    (230, 125),
+    (400, 195),
+    (110, 245),
+    (455, 195),
+    (330, 345),
+    (30, 345),
+    (265, 345),
+    (180, 245),
+    (370, 345),
+    (520, 295),
+)
+
+PLAYER_COLORS = (
+    (245, 82, 94),
+    (70, 194, 255),
+    (255, 198, 74),
+    (118, 232, 157),
+    (190, 116, 255),
+    (255, 129, 74),
+    (70, 224, 214),
+    (255, 117, 194),
+    (172, 219, 75),
+    (102, 139, 255),
+    (242, 238, 120),
+    (200, 200, 210),
+)
+
+# Input bit mask. The original controls are preserved.
+INPUT_LEFT = 1 << 0
+INPUT_RIGHT = 1 << 1
+INPUT_CROUCH = 1 << 2
+INPUT_JUMP = 1 << 3
+INPUT_DASH = 1 << 4
+INPUT_ATTACK = 1 << 5
+
+# Player state flags sent in snapshots.
+FLAG_ALIVE = 1 << 0
+FLAG_CROUCHING = 1 << 1
+FLAG_ATTACKING = 1 << 2
+FLAG_DASHING = 1 << 3
+FLAG_ON_GROUND = 1 << 4
+
+PHASE_WAITING = 0
+PHASE_ACTIVE = 1
+PHASE_ROUND_OVER = 2
+
+EVENT_HIT = 1
+EVENT_KILL = 2
